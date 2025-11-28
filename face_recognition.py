@@ -7,6 +7,9 @@ import time
 from datetime import datetime
 from insightface.app import FaceAnalysis
 import pickle
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # --- MONITOR DE SISTEMA ---
@@ -211,12 +214,60 @@ class FaceRecognitionSystem:
         return np.hstack((frame, panel))
 
     def run_recognition(self):
+        # ---------------- CONFIGURACIÓN SEGURA ----------------
+        # Leemos las variables del archivo .env
+        user = os.getenv("HIK_USER")
+        password = os.getenv("HIK_PASS")
+        ip = os.getenv("HIK_IP")
+        channel = os.getenv("HIK_CHANNEL")
+
+        # Validamos que existan (para no tener errores raros después)
+        if not all([user, password, ip, channel]):
+            print("❌ Error: Faltan variables en el archivo .env")
+            return
+
+        # Construimos la URL usando f-strings (Interpolación)
+        RTSP_URL = f"rtsp://{user}:{password}@{ip}:554/Streaming/Channels/{channel}"
+
+        # Configuración para reducir latencia y usar TCP/UDP
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+
+        # Ocultamos la contraseña al imprimir en consola por seguridad
+        print(f"Conectando a cámara en: rtsp://{user}:*****@{ip}:554...")
+
+        cap = cv2.VideoCapture(RTSP_URL, cv2.CAP_FFMPEG)
+        # ------------------------------------------------------
+
+        if not cap.isOpened():
+            print("❌ Error: No se pudo conectar a la cámara IP.")
+            print("Verifica: 1. IP correcta, 2. Contraseña, 3. Cable de red")
+            return
+        else:
+            print("✅ Conexión exitosa con Hikvision DS-2CD1043G0-I")
+
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             print("No se pudo abrir la cámara")
             return
 
-        PROCESS_EVERY_N_FRAMES = 5
+        """
+        Habilitar la siguiente sesion si se tiene problemas con la camara
+        while True:
+            # Truco para cámaras IP: Leer el frame actual y descartar el buffer viejo
+            # Si notas mucho retraso, descomenta las siguientes 2 líneas:
+            # for _ in range(3): # Vaciar buffer
+            #    cap.read()
+            
+            ret, frame = cap.read()
+            if not ret:
+                print("Error de conexión o frame vacío")
+                # Intentar reconectar si se cae la red (Opcional avanzado)
+                break 
+
+            # ... resto del código ...
+        """
+
+        PROCESS_EVERY_N_FRAMES = 25
         frame_count = 0
         last_results = []
         last_metrics = (0, 0, 0)

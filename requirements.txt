@@ -3,3 +3,4 @@ opencv-python
 numpy 
 onnxruntime
 psutil
+python-dotenv

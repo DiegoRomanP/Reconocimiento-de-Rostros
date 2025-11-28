@@ -301,5 +301,65 @@
       "cpu": 92.0,
       "ram": 56.4
     }
+  },
+  {
+    "timestamp": "2025-11-28 14:31:59.021902",
+    "tipo_deteccion": "Desconocido",
+    "identidad": "N/A",
+    "confianza": 0.0554412417113781,
+    "sistema": {
+      "cpu": 92.5,
+      "ram": 55.7
+    }
+  },
+  {
+    "timestamp": "2025-11-28 14:32:03.592842",
+    "tipo_deteccion": "Desconocido",
+    "identidad": "N/A",
+    "confianza": 0.09824543446302414,
+    "sistema": {
+      "cpu": 91.4,
+      "ram": 55.9
+    }
+  },
+  {
+    "timestamp": "2025-11-28 14:32:08.057824",
+    "tipo_deteccion": "Desconocido",
+    "identidad": "N/A",
+    "confianza": 0.07364603132009506,
+    "sistema": {
+      "cpu": 92.0,
+      "ram": 56.0
+    }
+  },
+  {
+    "timestamp": "2025-11-28 14:32:12.387715",
+    "tipo_deteccion": "Desconocido",
+    "identidad": "N/A",
+    "confianza": 0.08455535024404526,
+    "sistema": {
+      "cpu": 92.6,
+      "ram": 56.0
+    }
+  },
+  {
+    "timestamp": "2025-11-28 14:32:16.827772",
+    "tipo_deteccion": "Conocido",
+    "identidad": "DIEGO",
+    "confianza": 0.5218044519424438,
+    "sistema": {
+      "cpu": 93.4,
+      "ram": 56.0
+    }
+  },
+  {
+    "timestamp": "2025-11-28 14:32:22.521171",
+    "tipo_deteccion": "Conocido",
+    "identidad": "DIEGO",
+    "confianza": 0.6756471991539001,
+    "sistema": {
+      "cpu": 92.9,
+      "ram": 56.0
+    }
   }
 ]
