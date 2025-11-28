@@ -250,6 +250,7 @@ class FaceRecognitionSystem:
             print("No se pudo abrir la cámara")
             return
         """
+        """
         while True:
             # Truco para cámaras IP: Leer el frame actual y descartar el buffer viejo
             # Si notas mucho retraso, descomenta las siguientes 2 líneas:
@@ -263,7 +264,7 @@ class FaceRecognitionSystem:
                 break
 
             # ... resto del código ...
-
+        """
         PROCESS_EVERY_N_FRAMES = 5
         frame_count = 0
         last_results = []
