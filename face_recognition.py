@@ -2,284 +2,239 @@ import os
 import cv2
 import numpy as np
 import json
-from datetime import datetime, timedelta
+import psutil  # <--- IMPORTANTE: Nueva librería para métricas
+import time
+from datetime import datetime
 from insightface.app import FaceAnalysis
 import pickle
 
 
+# --- CLASE PARA GESTIÓN DE MÉTRICAS ---
+class SystemMonitor:
+    def __init__(self, log_file="medidas.json"):
+        self.log_file = log_file
+        # Inicializamos el archivo si no existe
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, "w") as f:
+                json.dump([], f)
+
+    def get_system_metrics(self):
+        """Obtiene uso de CPU y RAM actuales"""
+        # interval=None hace que la lectura de CPU sea no bloqueante
+        cpu_usage = psutil.cpu_percent(interval=None)
+        ram = psutil.virtual_memory()
+        return cpu_usage, ram.percent, ram.used / (1024 * 1024)  # MB usados
+
+    def log_detection(self, person_name, confidence, is_known):
+        """Registra una detección y el estado del sistema en ese momento"""
+        cpu, ram_percent, ram_mb = self.get_system_metrics()
+
+        entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+            "tipo_deteccion": "Conocido" if is_known else "Desconocido",
+            "identidad_predicha": person_name if person_name else "N/A",
+            "nivel_confianza": float(confidence),  # Precisión del modelo (0.0 a 1.0)
+            "metricas_sistema": {
+                "cpu_percent": cpu,
+                "ram_percent": ram_percent,
+                "ram_usada_mb": round(ram_mb, 2),
+            },
+        }
+
+        self._save_to_json(entry)
+
+    def _save_to_json(self, new_entry):
+        """Guarda en el archivo JSON (Append eficiente)"""
+        try:
+            # Leemos datos existentes
+            data = []
+            if os.path.exists(self.log_file) and os.path.getsize(self.log_file) > 0:
+                with open(self.log_file, "r") as f:
+                    try:
+                        data = json.load(f)
+                    except json.JSONDecodeError:
+                        data = []
+
+            data.append(new_entry)
+
+            # Escribimos de nuevo (En producción real usaríamos una base de datos o logs rotativos)
+            with open(self.log_file, "w") as f:
+                json.dump(data, f, indent=2)
+
+        except Exception as e:
+            print(f"Error guardando métricas: {e}")
+
+
+# --- SISTEMA PRINCIPAL ---
 class FaceRecognitionSystem:
     def __init__(
         self,
         known_faces_dir="identified-face",
         unknown_faces_dir="not-identified",
         embeddings_file="face_embeddings.pkl",
-        records_file="access_records.json",
     ):
-        """
-        Sistema de reconocimiento facial usando InsightFace
-        """
         self.known_faces_dir = known_faces_dir
         self.unknown_faces_dir = unknown_faces_dir
         self.embeddings_file = embeddings_file
-        self.records_file = records_file
 
-        # Crear directorios si no existen
+        # Inicializar Monitor de Métricas
+        self.monitor = SystemMonitor("medidas.json")
+
         os.makedirs(known_faces_dir, exist_ok=True)
         os.makedirs(unknown_faces_dir, exist_ok=True)
 
-        # Inicializar el modelo de InsightFace
-        print("Cargando modelo InsightFace (puede tardar la primera vez)...")
-        # Usamos CPUExecutionProvider para asegurar compatibilidad.
-        # Si tienes GPU NVIDIA configurada en tu Arch Linux, cambia a ['CUDAExecutionProvider']
+        print("Cargando modelo InsightFace (buffalo_l)...")
+        # Mantenemos buffalo_l por tu requerimiento de precisión
         self.app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
-        # la siguiente linea es para cuando hay graficos
-        # self.app.prepare(ctx_id=0, det_size=(640, 640))
-        self.app.prepare(ctx_id=-1, det_size=(160, 160))
+        self.app.prepare(ctx_id=-1, det_size=(480, 480))  # Resolución balanceada
 
-        # Base de datos de embeddings
         self.known_embeddings = {}
         self.load_and_update_embeddings()
 
-        # Umbral de similitud (ajustable)
         self.similarity_threshold = 0.4
 
     def load_and_update_embeddings(self):
-        """Carga embeddings existentes y busca nuevas imágenes para registrar"""
-        # 1. Cargar lo que ya existe en el pickle
         if os.path.exists(self.embeddings_file):
-            print(f"Cargando embeddings desde {self.embeddings_file}...")
+            print(f"Cargando embeddings...")
             try:
                 with open(self.embeddings_file, "rb") as f:
                     self.known_embeddings = pickle.load(f)
-                print(f"Se cargaron {len(self.known_embeddings)} personas de la caché.")
-            except Exception as e:
-                print(f"Error cargando pickle (se creará uno nuevo): {e}")
+            except Exception:
                 self.known_embeddings = {}
-
-        # 2. Verificar si hay imágenes nuevas en la carpeta que no estén en el pickle
         self.register_new_faces()
 
     def register_new_faces(self):
-        """Registra rostros de la carpeta que aún no tienen embedding"""
         if not os.path.exists(self.known_faces_dir):
             return
 
         image_files = [
             f
             for f in os.listdir(self.known_faces_dir)
-            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            if f.lower().endswith((".jpg", ".png"))
         ]
-
-        changes_made = False
+        changes = False
 
         for img_file in image_files:
-            person_name = os.path.splitext(img_file)[0]
-
-            # Si ya tenemos el embedding de esta persona, saltamos para ahorrar tiempo
-            if person_name in self.known_embeddings:
+            name = os.path.splitext(img_file)[0]
+            if name in self.known_embeddings:
                 continue
 
-            print(f"Procesando nueva imagen: {img_file}...")
-            img_path = os.path.join(self.known_faces_dir, img_file)
-            img = cv2.imread(img_path)
-
+            img = cv2.imread(os.path.join(self.known_faces_dir, img_file))
             if img is None:
-                print(f"Error: No se pudo leer {img_file}")
                 continue
 
-            # Detectar rostro
             faces = self.app.get(img)
+            if len(faces) > 0:
+                # Ordenar por tamaño para tomar la cara principal
+                faces = sorted(
+                    faces,
+                    key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
+                    reverse=True,
+                )
+                self.known_embeddings[name] = faces[0].normed_embedding
+                print(f"Registrado: {name}")
+                changes = True
 
-            if len(faces) == 0:
-                print(f"⚠️ No se detectó rostro en: {img_file}")
-                continue
-
-            # Usar el rostro más grande si hay varios (asumimos que es el sujeto principal)
-            faces = sorted(
-                faces,
-                key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
-                reverse=True,
-            )
-
-            self.known_embeddings[person_name] = faces[0].normed_embedding
-            print(f"✅ Registrado nuevo: {person_name}")
-            changes_made = True
-
-        # Guardar embeddings actualizados solo si hubo cambios
-        if changes_made:
+        if changes:
             with open(self.embeddings_file, "wb") as f:
                 pickle.dump(self.known_embeddings, f)
-            print("Base de datos de embeddings actualizada.")
-        else:
-            print("No se encontraron imágenes nuevas para procesar.")
-
-    def cosine_similarity(self, embedding1, embedding2):
-        """Calcula similitud coseno entre dos embeddings"""
-        return np.dot(embedding1, embedding2) / (
-            np.linalg.norm(embedding1) * np.linalg.norm(embedding2)
-        )
 
     def identify_face(self, face_embedding):
-        """Identifica un rostro comparando con la base de datos"""
         if not self.known_embeddings:
             return None, 0.0
 
         best_match = None
-        best_similarity = -1
+        best_sim = -1
 
-        for name, known_embedding in self.known_embeddings.items():
-            similarity = self.cosine_similarity(face_embedding, known_embedding)
-            if similarity > best_similarity:
-                best_similarity = similarity
+        for name, emb in self.known_embeddings.items():
+            sim = np.dot(face_embedding, emb) / (
+                np.linalg.norm(face_embedding) * np.linalg.norm(emb)
+            )
+            if sim > best_sim:
+                best_sim = sim
                 best_match = name
 
-        if best_similarity > self.similarity_threshold:
-            return best_match, best_similarity
-        else:
-            return None, best_similarity
-
-    def save_access_record(self, person_name, confidence):
-        """Guarda registro de acceso en archivo JSON"""
-        record = {
-            "nombre": person_name,
-            "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "confianza": float(confidence),  # Convertir numpy float a python float
-        }
-
-        try:
-            if os.path.exists(self.records_file):
-                with open(self.records_file, "r", encoding="utf-8") as f:
-                    try:
-                        records = json.load(f)
-                    except json.JSONDecodeError:
-                        records = []
-            else:
-                records = []
-
-            records.append(record)
-
-            with open(self.records_file, "w", encoding="utf-8") as f:
-                json.dump(records, f, indent=2, ensure_ascii=False)
-
-        except Exception as e:
-            print(f"Error guardando registro: {e}")
-
-    def save_unknown_face(self, face_img):
-        """Guarda imagen de rostro no identificado"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"unknown_{timestamp}.jpg"
-        filepath = os.path.join(self.unknown_faces_dir, filename)
-        cv2.imwrite(filepath, face_img)
-        print(f"📸 Rostro desconocido guardado: {filename}")
+        if best_sim > self.similarity_threshold:
+            return best_match, best_sim
+        return None, best_sim
 
     def run_recognition(self):
-        """Ejecuta el sistema de reconocimiento en tiempo real"""
         cap = cv2.VideoCapture(0)
-
         if not cap.isOpened():
-            print("Error: No se pudo abrir la cámara")
+            print("Error cámara")
             return
 
-        print("\n=== Sistema de Reconocimiento Iniciado ===")
-        print("Presiona 'q' para salir")
-        print("Presiona 'r' para recargar base de datos")
+        print("\nIniciando sistema con REGISTRO DE MÉTRICAS...")
 
-        # Control de tiempos para evitar spam de registros
-        last_identified_time = {}
-        last_unknown_save_time = datetime.min
+        # Variables para optimización (Frame Skipping)
+        PROCESS_EVERY_N_FRAMES = 15  # Ajustable según temperatura de la RPi
+        frame_count = 0
+        last_results = []
 
-        # Configuraciones de Cooldown (en segundos)
-        KNOWN_COOLDOWN = 5  # Tiempo entre registros de acceso para la misma persona
-        UNKNOWN_COOLDOWN = 5.0  # Tiempo entre fotos guardadas de desconocidos
+        # Cooldown para no llenar el JSON de métricas con datos repetidos en milisegundos
+        last_log_time = 0
+        LOG_COOLDOWN = 1.0  # Registrar métricas máximo 1 vez por segundo
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
 
-            # Detectar rostros
-            faces = self.app.get(frame)
-            current_time = datetime.now()
+            current_time = time.time()
 
-            for face in faces:
-                bbox = face.bbox.astype(int)
-                x1, y1, x2, y2 = bbox
+            # --- LÓGICA DE DETECCIÓN (Solo cada N frames) ---
+            if frame_count % PROCESS_EVERY_N_FRAMES == 0:
+                faces = self.app.get(frame)
+                last_results = []
 
-                # Identificar rostro
-                person_name, confidence = self.identify_face(face.normed_embedding)
+                for face in faces:
+                    name, conf = self.identify_face(face.normed_embedding)
+                    box = face.bbox.astype(int)
 
-                if person_name:
-                    # --- CASO: CONOCIDO ---
-                    color = (0, 255, 0)
-                    label = f"{person_name} ({confidence:.2f})"
+                    is_known = name is not None
+                    display_name = name if is_known else "Desconocido"
 
-                    # Verificar cooldown para no llenar el JSON
-                    last_time = last_identified_time.get(person_name, datetime.min)
-                    if (current_time - last_time).total_seconds() > KNOWN_COOLDOWN:
-                        self.save_access_record(person_name, confidence)
-                        last_identified_time[person_name] = current_time
-                        print(f"✓ Acceso registrado: {person_name}")
+                    last_results.append((box, display_name, conf, is_known))
 
-                else:
-                    # --- CASO: DESCONOCIDO ---
-                    color = (0, 0, 255)
-                    label = f"Desconocido ({confidence:.2f})"
+                    # --- REGISTRO DE MÉTRICAS ---
+                    # Solo registramos si ha pasado el tiempo de cooldown para no colapsar el archivo
+                    if current_time - last_log_time > LOG_COOLDOWN:
+                        # Logueamos tanto conocidos como desconocidos para análisis de precisión
+                        self.monitor.log_detection(name, conf, is_known)
+                        last_log_time = current_time
 
-                    # Verificar cooldown para no llenar el disco duro de fotos
-                    if (
-                        current_time - last_unknown_save_time
-                    ).total_seconds() > UNKNOWN_COOLDOWN:
-                        face_crop = frame[
-                            max(0, y1) : min(frame.shape[0], y2),
-                            max(0, x1) : min(frame.shape[1], x2),
-                        ]
+            frame_count += 1
 
-                        if face_crop.size > 0:
-                            self.save_unknown_face(face_crop)
-                            last_unknown_save_time = current_time
-
-                # Dibujar interfaz
+            # --- DIBUJADO ---
+            for box, name, conf, is_known in last_results:
+                color = (0, 255, 0) if is_known else (0, 0, 255)
+                x1, y1, x2, y2 = box
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-                # Fondo para el texto para mejor legibilidad
-                text_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                cv2.rectangle(frame, (x1, y1 - 25), (x1 + text_size[0], y1), color, -1)
                 cv2.putText(
                     frame,
-                    label,
-                    (x1, y1 - 6),
+                    f"{name} {conf:.2f}",
+                    (x1, y1 - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
-                    (255, 255, 255),
+                    color,
                     2,
                 )
 
-            cv2.imshow("Sistema de Acceso - LAB", frame)
+            # Mostrar info de sistema en pantalla también (opcional)
+            if frame_count % 30 == 0:  # Actualizar info en consola cada ~1 seg
+                cpu, ram, _ = self.monitor.get_system_metrics()
+                print(f"Estado Sistema -> CPU: {cpu}% | RAM: {ram}%")
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord("q"):
+            cv2.imshow("Monitor de Rendimiento AI", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
-            elif key == ord("r"):
-                print("\nRecargando base de datos...")
-                self.load_and_update_embeddings()
 
         cap.release()
         cv2.destroyAllWindows()
-        print("\nSistema finalizado correctamente.")
-
-
-def main():
-    system = FaceRecognitionSystem()
-
-    # Validar que existan datos antes de iniciar cámara
-    if not system.known_embeddings:
-        print("\n⚠️  ADVERTENCIA: No hay rostros registrados.")
-        print(f"Coloca imágenes .jpg en la carpeta '{system.known_faces_dir}'")
-        # No retornamos inmediatamente, permitimos iniciar para probar la detección
-        input("Presiona ENTER para iniciar la cámara (solo detectará desconocidos)...")
-
-    system.run_recognition()
 
 
 if __name__ == "__main__":
-    main()
+    SystemMonitor()  # Crea el archivo si no existe
+    sys = FaceRecognitionSystem()
+    sys.run_recognition()

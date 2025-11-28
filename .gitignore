@@ -1,0 +1,5 @@
+.venv 
+access_records.json
+face_embeddings.pkl
+identified-face/ 
+not-identified/

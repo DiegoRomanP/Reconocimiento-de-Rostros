@@ -1,0 +1,145 @@
+[
+  {
+    "timestamp": "2025-11-28 12:27:34.791348",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.5966688990592957,
+    "metricas_sistema": {
+      "cpu_percent": 66.4,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7668.61
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:36.685493",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6913726925849915,
+    "metricas_sistema": {
+      "cpu_percent": 91.6,
+      "ram_percent": 49.1,
+      "ram_usada_mb": 7678.18
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:38.547245",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6516631245613098,
+    "metricas_sistema": {
+      "cpu_percent": 89.5,
+      "ram_percent": 49.1,
+      "ram_usada_mb": 7680.61
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:40.473372",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6654388308525085,
+    "metricas_sistema": {
+      "cpu_percent": 91.2,
+      "ram_percent": 49.1,
+      "ram_usada_mb": 7680.79
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:42.468482",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6705865859985352,
+    "metricas_sistema": {
+      "cpu_percent": 88.5,
+      "ram_percent": 49.1,
+      "ram_usada_mb": 7680.13
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:45.645407",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6661675572395325,
+    "metricas_sistema": {
+      "cpu_percent": 90.6,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7668.95
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:47.687487",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6715822815895081,
+    "metricas_sistema": {
+      "cpu_percent": 88.4,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7663.83
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:49.579287",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.668584406375885,
+    "metricas_sistema": {
+      "cpu_percent": 90.7,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7667.34
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:51.473259",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6572685837745667,
+    "metricas_sistema": {
+      "cpu_percent": 89.2,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7663.89
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:53.572401",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6401767134666443,
+    "metricas_sistema": {
+      "cpu_percent": 90.7,
+      "ram_percent": 49.0,
+      "ram_usada_mb": 7663.45
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:55.722290",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6594118475914001,
+    "metricas_sistema": {
+      "cpu_percent": 88.4,
+      "ram_percent": 48.9,
+      "ram_usada_mb": 7659.18
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:27:57.949529",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6971229910850525,
+    "metricas_sistema": {
+      "cpu_percent": 89.6,
+      "ram_percent": 48.9,
+      "ram_usada_mb": 7652.19
+    }
+  },
+  {
+    "timestamp": "2025-11-28 12:28:00.101372",
+    "tipo_deteccion": "Conocido",
+    "identidad_predicha": "DIEGO",
+    "nivel_confianza": 0.6646919846534729,
+    "metricas_sistema": {
+      "cpu_percent": 88.2,
+      "ram_percent": 48.9,
+      "ram_usada_mb": 7652.61
+    }
+  }
+]
