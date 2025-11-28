@@ -1,39 +1,40 @@
-# 👁️ Sistema de Control de Acceso por Reconocimiento Facial
+# 👁️ Sistema de Control de Acceso Facial con Telemetría (Edge AI)
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
-![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-green)
 ![InsightFace](https://img.shields.io/badge/InsightFace-SOTA%20Model-orange)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Raspberry%20Pi-lightgrey)
+![Performance](https://img.shields.io/badge/Performance-RealTime%20Monitoring-brightgreen)
+![Platform](https://img.shields.io/badge/Device-Raspberry%20Pi%204%2F5-lightgrey)
 
-Un sistema de reconocimiento facial en tiempo real robusto y optimizado, diseñado para control de asistencia o seguridad. Utiliza **InsightFace (ArcFace)** para la generación de embeddings vectoriales de alta precisión y **OpenCV** para el procesamiento de video.
+Un sistema de reconocimiento facial robusto diseñado para entornos de **Edge Computing**. Implementa un pipeline de visión computacional optimizado que separa la inferencia (IA) del renderizado (UI), permitiendo una ejecución fluida en hardware limitado como Raspberry Pi.
 
-Este proyecto implementa lógica de persistencia de datos, optimización de memoria (caché de embeddings) y gestión inteligente de registros para evitar redundancia, siendo compatible con entornos de **Edge AI** como Raspberry Pi 4/5.
+El proyecto incluye un **Dashboard de Rendimiento** integrado y un módulo de **Data Logging** para el análisis posterior de consumo de recursos (CPU/RAM) y métricas de precisión del modelo.
 
-## 🚀 Características Principales
+## 🚀 Características de Ingeniería
 
-* **Detección y Reconocimiento en Tiempo Real:** Uso del modelo `buffalo_l` para alta precisión.
-* **Vector Embeddings:** Conversión de rostros a vectores de 512 dimensiones para comparación matemática.
-* **Similitud Coseno:** Algoritmo matemático para determinar la identidad con un umbral ajustable.
-* **Gestión Inteligente de Registros (Cooldown):** Evita el "spam" de registros en la base de datos JSON si la persona permanece frente a la cámara.
-* **Captura de Intrusos:** Detecta y guarda automáticamente fotografías de rostros desconocidos (con limitador de frecuencia para ahorrar almacenamiento).
-* **Sistema Híbrido de Carga:** Carga rápida mediante `pickle` y escaneo automático de nuevas imágenes en la carpeta de registro.
+* **Arquitectura Detect & Track:** Implementación de *Frame Skipping* (procesamiento asíncrono simétrico) para mantener 30 FPS visuales mientras la inferencia corre a 3-5 FPS, evitando el *thermal throttling*.
+* **Dashboard UI Integrado:** Interfaz gráfica profesional que separa el video de los metadatos. Muestra en tiempo real:
+  * Estado de Salud del Hardware (CPU % / RAM %).
+  * Identidad y Nivel de Confianza (Confidence Score).
+  * Alertas visuales de acceso (Verde/Rojo).
+* **Vector Embeddings (ArcFace):** Uso del modelo `buffalo_l` para generar vectores de 512 dimensiones, garantizando alta precisión (>99.5% en LFW) incluso en condiciones difíciles.
+* **Telemetría y Data Science:** Registro automático en `medidas.json` de cada inferencia, vinculando la precisión del modelo con el estado del hardware en ese milisegundo exacto.
 
-## 🛠️ Tecnologías Utilizadas
+## 🛠️ Stack Tecnológico
 
-* **Lenguaje:** Python 3.x
-* **Visión Computacional:** OpenCV (`cv2`)
-* **Deep Learning / Model:** InsightFace (ONNX Runtime)
-* **Procesamiento Numérico:** NumPy
-* **Persistencia:** JSON (Logs) y Pickle (Embeddings Cache)
+* **Core:** Python 3.x
+* **Visión:** OpenCV (`cv2`)
+* **Model Serving:** InsightFace sobre ONNX Runtime (CPU Optimized)
+* **Monitoring:** Psutil (Métricas de sistema)
+* **Math:** NumPy (Cálculo de similitud coseno y manipulación de matrices)
 
 ## 📂 Estructura del Proyecto
 
 ```text
 .
-├── identified-face/       # 📸 Coloca aquí las fotos de personas conocidas (ej: juan_perez.jpg)
-├── not-identified/        # ⚠️ Aquí se guardan automáticamente los desconocidos
-├── face_embeddings.pkl    # 🧠 Archivo caché de vectores (se genera solo)
-├── access_records.json    # 📝 Log de accesos en formato JSON
-├── main.py                # 🐍 Script principal
-├── requirements.txt       # 📦 Dependencias
+├── identified-face/       # 📸 Dataset: Imágenes de usuarios autorizados
+├── not-identified/        # ⚠️ Dataset: Capturas automáticas de intrusos
+├── face_embeddings.pkl    # 🧠 Cache de vectores (Serialización Pickle)
+├── medidas.json           # 📊 Telemetría: Logs para análisis de Data Science
+├── face_recognition.py    # 🐍 Código fuente principal
+├── requirements.txt       # 📦 Dependencias del proyecto
 └── README.md              # 📄 Documentación
