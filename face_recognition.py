@@ -86,7 +86,9 @@ class FaceRecognitionSystem:
             try:
                 with open(self.embeddings_file, "rb") as f:
                     self.known_embeddings = pickle.load(f)
-                print(f"   ✅ Se cargaron {len(self.known_embeddings)} perfiles existentes.")
+                print(
+                    f"   ✅ Se cargaron {len(self.known_embeddings)} perfiles existentes."
+                )
             except Exception as e:
                 print(f"   ⚠️ Error leyendo archivo (posiblemente corrupto): {e}")
                 print("   🔄 Se creará una nueva base de datos.")
@@ -102,18 +104,18 @@ class FaceRecognitionSystem:
 
         print(f"🔎 Escaneando carpeta '{self.known_faces_dir}'...")
         image_files = os.listdir(self.known_faces_dir)
-        
+
         if not image_files:
             print("   ⚠️ La carpeta está vacía. No hay rostros para aprender.")
-        
+
         changed = False
-        
+
         for f in image_files:
             if not f.lower().endswith((".jpg", ".png", ".jpeg")):
                 continue
-                
+
             name = os.path.splitext(f)[0]
-            
+
             # Si ya lo tenemos registrado, saltamos
             if name in self.known_embeddings:
                 continue
@@ -131,14 +133,14 @@ class FaceRecognitionSystem:
             if len(faces) == 0:
                 print("⚠️ NO SE DETECTÓ ROSTRO. Esta imagen será ignorada.")
                 continue
-            
+
             # Si hay más de un rostro, tomamos el más grande
             faces = sorted(
                 faces,
                 key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
                 reverse=True,
             )
-            
+
             # Guardamos el embedding
             self.known_embeddings[name] = faces[0].normed_embedding
             print("✅ OK! Registrado.")
@@ -154,10 +156,13 @@ class FaceRecognitionSystem:
             except Exception as e:
                 print(f"❌ Error guardando el archivo .pkl: {e}")
         elif len(self.known_embeddings) == 0:
-             print("⚠️ Advertencia: No hay rostros registrados. El sistema no reconocerá a nadie.")
+            print(
+                "⚠️ Advertencia: No hay rostros registrados. El sistema no reconocerá a nadie."
+            )
         else:
             print("👌 No se encontraron cambios nuevos.")
-        def identify_face(self, embedding):
+
+    def identify_face(self, embedding):
         if not self.known_embeddings:
             return None, 0.0
 
