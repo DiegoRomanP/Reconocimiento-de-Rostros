@@ -79,41 +79,85 @@ class FaceRecognitionSystem:
         # Si sigue fallando, bájalo a 0.35
         self.similarity_threshold = 0.20
 
-    def load_and_update_embeddings(self):
+        def load_and_update_embeddings(self):
+        # 1. Intentar cargar embeddings previos
         if os.path.exists(self.embeddings_file):
+            print(f"📂 Cargando base de datos desde {self.embeddings_file}...")
             try:
                 with open(self.embeddings_file, "rb") as f:
                     self.known_embeddings = pickle.load(f)
-            except:
+                print(f"   ✅ Se cargaron {len(self.known_embeddings)} perfiles existentes.")
+            except Exception as e:
+                print(f"   ⚠️ Error leyendo archivo (posiblemente corrupto): {e}")
+                print("   🔄 Se creará una nueva base de datos.")
                 self.known_embeddings = {}
+        else:
+            print("🆕 Creando nueva base de datos de rostros...")
+            self.known_embeddings = {}
 
-        if os.path.exists(self.known_faces_dir):
-            changed = False
-            for f in os.listdir(self.known_faces_dir):
-                if (
-                    f.lower().endswith((".jpg", ".png"))
-                    and os.path.splitext(f)[0] not in self.known_embeddings
-                ):
-                    img = cv2.imread(os.path.join(self.known_faces_dir, f))
-                    if img is not None:
-                        faces = self.app.get(img)
-                        if faces:
-                            faces = sorted(
-                                faces,
-                                key=lambda x: (x.bbox[2] - x.bbox[0])
-                                * (x.bbox[3] - x.bbox[1]),
-                                reverse=True,
-                            )
-                            self.known_embeddings[os.path.splitext(f)[0]] = faces[
-                                0
-                            ].normed_embedding
-                            print(f"Registrado nuevo: {os.path.splitext(f)[0]}")
-                            changed = True
-            if changed:
+        # 2. Escanear carpeta buscando fotos nuevas
+        if not os.path.exists(self.known_faces_dir):
+            print(f"❌ Error: La carpeta '{self.known_faces_dir}' no existe.")
+            return
+
+        print(f"🔎 Escaneando carpeta '{self.known_faces_dir}'...")
+        image_files = os.listdir(self.known_faces_dir)
+        
+        if not image_files:
+            print("   ⚠️ La carpeta está vacía. No hay rostros para aprender.")
+        
+        changed = False
+        
+        for f in image_files:
+            if not f.lower().endswith((".jpg", ".png", ".jpeg")):
+                continue
+                
+            name = os.path.splitext(f)[0]
+            
+            # Si ya lo tenemos registrado, saltamos
+            if name in self.known_embeddings:
+                continue
+
+            print(f"   Procesando: {f}...", end=" ")
+            img_path = os.path.join(self.known_faces_dir, f)
+            img = cv2.imread(img_path)
+
+            if img is None:
+                print("❌ Error: No se pudo leer la imagen (archivo dañado).")
+                continue
+
+            faces = self.app.get(img)
+
+            if len(faces) == 0:
+                print("⚠️ NO SE DETECTÓ ROSTRO. Esta imagen será ignorada.")
+                continue
+            
+            # Si hay más de un rostro, tomamos el más grande
+            faces = sorted(
+                faces,
+                key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]),
+                reverse=True,
+            )
+            
+            # Guardamos el embedding
+            self.known_embeddings[name] = faces[0].normed_embedding
+            print("✅ OK! Registrado.")
+            changed = True
+
+        # 3. Guardar cambios en el archivo .pkl
+        if changed:
+            print("💾 Guardando cambios en face_embeddings.pkl...")
+            try:
                 with open(self.embeddings_file, "wb") as f:
                     pickle.dump(self.known_embeddings, f)
-
-    def identify_face(self, embedding):
+                print("✅ Base de datos actualizada correctamente.")
+            except Exception as e:
+                print(f"❌ Error guardando el archivo .pkl: {e}")
+        elif len(self.known_embeddings) == 0:
+             print("⚠️ Advertencia: No hay rostros registrados. El sistema no reconocerá a nadie.")
+        else:
+            print("👌 No se encontraron cambios nuevos.")
+        def identify_face(self, embedding):
         if not self.known_embeddings:
             return None, 0.0
 
