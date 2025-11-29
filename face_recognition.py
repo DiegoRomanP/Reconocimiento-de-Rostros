@@ -77,7 +77,7 @@ class FaceRecognitionSystem:
 
         # AJUSTE: He bajado un poco el umbral por si la cámara tiene luz diferente
         # Si sigue fallando, bájalo a 0.35
-        self.similarity_threshold = 0.4
+        self.similarity_threshold = 0.20
 
     def load_and_update_embeddings(self):
         if os.path.exists(self.embeddings_file):
