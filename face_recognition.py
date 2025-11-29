@@ -55,21 +55,28 @@ class SystemMonitor:
 # --- SISTEMA DE RECONOCIMIENTO ---
 class FaceRecognitionSystem:
     def __init__(
-        self, known_faces_dir="identified-face", embeddings_file="face_embeddings.pkl"
+        self,
+        known_faces_dir="identified-face",
+        unknown_faces_dir="not-identified",  # <--- NUEVO: Directorio recuperado
+        embeddings_file="face_embeddings.pkl",
     ):
         self.known_faces_dir = known_faces_dir
+        self.unknown_faces_dir = unknown_faces_dir
         self.embeddings_file = embeddings_file
         self.monitor = SystemMonitor("medidas.json")
 
         os.makedirs(known_faces_dir, exist_ok=True)
+        os.makedirs(unknown_faces_dir, exist_ok=True)  # Crear carpeta si no existe
 
         print("Cargando modelo InsightFace...")
-        # Usamos buffalo_l y resolución media
         self.app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
         self.app.prepare(ctx_id=-1, det_size=(480, 480))
 
         self.known_embeddings = {}
         self.load_and_update_embeddings()
+
+        # AJUSTE: He bajado un poco el umbral por si la cámara tiene luz diferente
+        # Si sigue fallando, bájalo a 0.35
         self.similarity_threshold = 0.4
 
     def load_and_update_embeddings(self):
@@ -91,7 +98,6 @@ class FaceRecognitionSystem:
                     if img is not None:
                         faces = self.app.get(img)
                         if faces:
-                            # Ordenar para tomar la cara más grande
                             faces = sorted(
                                 faces,
                                 key=lambda x: (x.bbox[2] - x.bbox[0])
@@ -108,7 +114,6 @@ class FaceRecognitionSystem:
                     pickle.dump(self.known_embeddings, f)
 
     def identify_face(self, embedding):
-        """Identifica un rostro comparando con la base de datos"""
         if not self.known_embeddings:
             return None, 0.0
 
@@ -119,20 +124,35 @@ class FaceRecognitionSystem:
             sim = np.dot(embedding, emb) / (
                 np.linalg.norm(embedding) * np.linalg.norm(emb)
             )
-
             if sim > best_sim:
                 best_sim = sim
                 best_match = name
+
+        # DEBUG: Imprimir similitud para entender por qué falla
+        # Esto te ayudará a ver si necesitas bajar el similarity_threshold
+        if best_sim > 0.1:
+            print(f"Mejor coincidencia: {best_match} con similitud: {best_sim:.2f}")
 
         if best_sim > self.similarity_threshold:
             return best_match, best_sim
         else:
             return None, best_sim
 
+    # --- NUEVA FUNCIÓN RECUPERADA ---
+    def save_unknown_face(self, face_img):
+        """Guarda la imagen del rostro desconocido"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"unknown_{timestamp}.jpg"
+        filepath = os.path.join(self.unknown_faces_dir, filename)
+        try:
+            cv2.imwrite(filepath, face_img)
+            print(f"📸 Foto guardada: {filename}")
+        except Exception as e:
+            print(f"Error guardando foto: {e}")
+
     def draw_dashboard(self, frame, detection_info, metrics):
         h, w, _ = frame.shape
         panel_width = 300
-
         panel = np.zeros((h, panel_width, 3), dtype=np.uint8)
 
         WHITE = (255, 255, 255)
@@ -140,10 +160,7 @@ class FaceRecognitionSystem:
         RED = (0, 0, 255)
         GRAY = (200, 200, 200)
 
-        # --- SECCIÓN 1: ESTADO DEL SISTEMA ---
-        # CORRECCIÓN AQUÍ: Usamos FONT_HERSHEY_SIMPLEX
         cv2.putText(panel, "SISTEMA", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 2)
-
         cv2.putText(
             panel,
             f"CPU: {metrics[0]}%",
@@ -162,11 +179,8 @@ class FaceRecognitionSystem:
             GRAY,
             1,
         )
-
         cv2.line(panel, (10, 100), (panel_width - 10, 100), GRAY, 1)
 
-        # --- SECCIÓN 2: RESULTADOS DE DETECCIÓN ---
-        # CORRECCIÓN AQUÍ: Usamos FONT_HERSHEY_SIMPLEX
         cv2.putText(
             panel, "DETECCION", (10, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 2
         )
@@ -177,13 +191,10 @@ class FaceRecognitionSystem:
             )
         else:
             box, name, conf, is_known = detection_info[0]
-
             status_text = "ACCESO PERMITIDO" if is_known else "DESCONOCIDO"
             status_color = GREEN if is_known else RED
 
             cv2.rectangle(panel, (5, 145), (panel_width - 5, 175), status_color, -1)
-
-            # CORRECCIÓN AQUÍ: Usamos FONT_HERSHEY_SIMPLEX
             cv2.putText(
                 panel,
                 status_text,
@@ -193,7 +204,6 @@ class FaceRecognitionSystem:
                 (0, 0, 0),
                 2,
             )
-
             cv2.putText(
                 panel, "Identidad:", (10, 210), cv2.FONT_HERSHEY_SIMPLEX, 0.5, WHITE, 1
             )
@@ -214,68 +224,45 @@ class FaceRecognitionSystem:
         return np.hstack((frame, panel))
 
     def run_recognition(self):
-        # ---------------- CONFIGURACIÓN SEGURA ----------------
-        # Leemos las variables del archivo .env
         user = os.getenv("HIK_USER")
         password = os.getenv("HIK_PASS")
         ip = os.getenv("HIK_IP")
         channel = os.getenv("HIK_CHANNEL")
 
-        # Validamos que existan (para no tener errores raros después)
         if not all([user, password, ip, channel]):
             print("❌ Error: Faltan variables en el archivo .env")
             return
 
-        # Construimos la URL usando f-strings (Interpolación)
         RTSP_URL = f"rtsp://{user}:{password}@{ip}:554/Streaming/Channels/{channel}"
-
-        # Configuración para reducir latencia y usar TCP/UDP
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
-
-        # Ocultamos la contraseña al imprimir en consola por seguridad
         print(f"Conectando a cámara en: rtsp://{user}:*****@{ip}:554...")
 
         cap = cv2.VideoCapture(RTSP_URL, cv2.CAP_FFMPEG)
-        # ------------------------------------------------------
+
         if not cap.isOpened():
             print("❌ Error: No se pudo conectar a la cámara IP.")
-            print("Verifica: 1. IP correcta, 2. Contraseña, 3. Cable de red")
             return
         else:
-            print("✅ Conexión exitosa con Hikvision DS-2CD1043G0-I")
+            print("✅ Conexión exitosa con Hikvision")
 
-        """
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            print("No se pudo abrir la cámara")
-            return
-        """
-        """
-        while True:
-            # Truco para cámaras IP: Leer el frame actual y descartar el buffer viejo
-            # Si notas mucho retraso, descomenta las siguientes 2 líneas:
-            # for _ in range(3): # Vaciar buffer
-            #    cap.read()
-
-            ret, frame = cap.read()
-            if not ret:
-                print("Error de conexión o frame vacío")
-                # Intentar reconectar si se cae la red (Opcional avanzado)
-                break
-
-            # ... resto del código ...
-        """
         PROCESS_EVERY_N_FRAMES = 5
         frame_count = 0
         last_results = []
         last_metrics = (0, 0, 0)
 
+        # Variables de tiempo para evitar spam
         last_log_time = 0
         LOG_COOLDOWN = 1.0
+
+        last_unknown_save_time = 0
+        UNKNOWN_SAVE_COOLDOWN = 5.0  # Guardar foto de desconocido máximo cada 5 seg
 
         print("Sistema iniciado. Presiona 'q' para salir.")
 
         while True:
+            # Truco para vaciar buffer si hay delay
+            # for _ in range(2): cap.read()
+
             ret, frame = cap.read()
             if not ret:
                 break
@@ -291,11 +278,31 @@ class FaceRecognitionSystem:
                     name, conf = self.identify_face(face.normed_embedding)
                     box = face.bbox.astype(int)
                     is_known = name is not None
+
+                    # Guardamos resultados para pintar
                     last_results.append((box, name, conf, is_known))
 
+                    # 1. LOGGING (JSON)
                     if current_time - last_log_time > LOG_COOLDOWN:
                         self.monitor.log_detection(name, conf, is_known)
                         last_log_time = current_time
+
+                    # 2. CAPTURA DE DESCONOCIDOS (IMAGEN)
+                    # Si NO es conocido Y ha pasado el tiempo de cooldown
+                    if not is_known and (
+                        current_time - last_unknown_save_time > UNKNOWN_SAVE_COOLDOWN
+                    ):
+                        # Recortar la cara para guardar (con un margen pequeño si es posible)
+                        x1, y1, x2, y2 = box
+                        # Asegurar que las coordenadas estén dentro de la imagen
+                        h_img, w_img, _ = frame.shape
+                        x1, y1 = max(0, x1), max(0, y1)
+                        x2, y2 = min(w_img, x2), min(h_img, y2)
+
+                        face_crop = frame[y1:y2, x1:x2]
+                        if face_crop.size > 0:
+                            self.save_unknown_face(face_crop)
+                            last_unknown_save_time = current_time
 
             frame_count += 1
 
