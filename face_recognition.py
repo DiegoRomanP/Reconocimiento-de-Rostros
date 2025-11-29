@@ -79,7 +79,7 @@ class FaceRecognitionSystem:
         # Si sigue fallando, bájalo a 0.35
         self.similarity_threshold = 0.20
 
-        def load_and_update_embeddings(self):
+    def load_and_update_embeddings(self):
         # 1. Intentar cargar embeddings previos
         if os.path.exists(self.embeddings_file):
             print(f"📂 Cargando base de datos desde {self.embeddings_file}...")
